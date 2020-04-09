@@ -1,0 +1,2 @@
+MAC,Name
+4c:ef:c0:27:56:1e,Amazon Echo Dot
