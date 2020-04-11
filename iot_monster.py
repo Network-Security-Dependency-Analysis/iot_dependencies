@@ -5,8 +5,10 @@ REFERENCES:
 '''
 
 import sys
+import os
 import csv
 import argparse
+import json
 from scapy.utils import RawPcapReader
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, TCP, UDP, ICMP
@@ -20,32 +22,15 @@ from pprint import pprint
 import globals
 globals.init()
 
-# Debug function
-# def pcap_stats(pcap_name):
-#     total_packets = 0
-#     relevant_packets = 0
-#     layer_list = []
-#     print(f"Opening: {pcap_name}")
 
-#     for (pkt_data, pkt_metadata,) in RawPcapReader(pcap_name):
-#         ether_pkt = Ether(pkt_data)
+def output_to_json(output_directory):
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
 
-#         for layer in ether_pkt.layers():
-#             if layer not in layer_list:
-#                 layer_list.append(layer)
-
-#         if ether_pkt.src in globals.DEVICES.keys():
-#             if ether_pkt.haslayer(IP) and ip_address(ether_pkt[IP].dst).is_global:
-#                 relevant_packets += 1
-        
-#         total_packets += 1
-
-#     print(f"Stats for capture: {pcap_name}")
-#     print(f"\tTotal number of packets: {total_packets}")
-#     print(f"\tTotal number of relevant packets: {relevant_packets}")
-#     print(f"\tThe following protocol layers were seen:")
-#     for layer in layer_list:
-#         print(f"\t\t{layer}")
+    for device in globals.DEVICES.keys():
+        json_file = os.path.join(output_directory, globals.DEVICES[device]["Name"] + ".json")
+        with open(json_file, 'w') as fp:
+            json.dump(globals.DEVICES[device], fp)
 
 
 def extract_IPs(ether_pkt):
@@ -67,8 +52,8 @@ def extract_dns(ether_pkt):
     # Is the packet from a device we care about?
     if source_mac in globals.DEVICES.keys():
         if ether_pkt[DNS].qr == 0: # DNS request
-            # Build DNSQR structure to extract name
-            qname = DNSQR(ether_pkt[DNS].qd).qname
+            # Build DNSQR structure to extract name, convert from bytes to str
+            qname = DNSQR(ether_pkt[DNS].qd).qname.decode()
             if qname in globals.DEVICES[source_mac]["DNS"].keys():
                 globals.DEVICES[source_mac]["DNS"][qname]["count"] += 1
             else:
@@ -82,7 +67,7 @@ def analyze_pcap(pcap_name):
         print(f"Error opening file: {pcap_name}", file=sys.stderr)
         return
     
-    for (pkt_data, pkt_metadata,) in p:
+    for (pkt_data, *_) in p:
         ether_pkt = Ether(pkt_data)
 
         if ether_pkt.haslayer(DNS):
@@ -94,6 +79,7 @@ def analyze_pcap(pcap_name):
         # data we could get (e.g. http requests w/URLs?)
         elif ether_pkt.haslayer(IP):
             extract_IPs(ether_pkt)
+
 
 def create_device_dict(input_file):
     with open(input_file) as csvfile:
@@ -116,9 +102,7 @@ if __name__ == "__main__":
 
     with open(args.pcap_list) as f:
         for line in f.readlines():
-            # extract_IPs(line.strip())
-            # pcap_stats(line.strip())
             analyze_pcap(line.strip())
     
-    pprint(globals.DEVICES)
+    output_to_json(args.output_dir)
 
