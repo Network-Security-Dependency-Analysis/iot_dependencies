@@ -33,6 +33,39 @@ def output_to_json(output_directory):
             json.dump(globals.DEVICES[device], fp)
 
 
+# ==================================================================================================
+# Get the latitude and longitude of an IP address
+
+def get_ip_geo(ip_address):
+    try:
+        geo_ip_data = globals.GEO_LIB.city(ip_address)
+        if geo_ip_data:
+            lat = geo_ip_data.location.latitude
+            long = geo_ip_data.location.longitude
+            return lat, long
+
+    except Exception as e:
+        print("ERROR (GEOIP): " + str(e))
+
+    return None, None
+
+
+# ==================================================================================================
+# Get the Autonomous System information for the IP address
+
+def get_ip_asn(ip_address):
+    try:
+        asn_ip_data = globals.ASN_LIB.asn(ip_address)
+        if asn_ip_data:
+            asn = asn_ip_data.autonomous_system_number
+            as_org = asn_ip_data.autonomous_system_organization
+            return asn, as_org
+    except Exception as e:
+        print("ERROR (ASNIP): " + str(e))
+
+    return None, None
+
+
 def extract_IPs(ether_pkt):
     source_mac = ether_pkt.src
     dest_ip = ether_pkt[IP].dst
@@ -42,7 +75,15 @@ def extract_IPs(ether_pkt):
         # Is the destination IP globally routable (i.e. not a private address)?
         if ip_address(dest_ip).is_global:
             if dest_ip not in globals.DEVICES[source_mac]["IPs"].keys():
-                globals.DEVICES[source_mac]["IPs"][dest_ip] = {"count": 1}
+                ipgeo = get_ip_geo(dest_ip)
+                ipasn = get_ip_asn(dest_ip)
+                globals.DEVICES[source_mac]["IPs"][dest_ip] = {
+                    "count": 1,
+                    "lat": ipgeo[0],
+                    "lon": ipgeo[1],
+                    "asn": ipasn[0],
+                    "as_org": ipasn[1]
+                    }
             else:
                 globals.DEVICES[source_mac]["IPs"][dest_ip]["count"] += 1
 
@@ -87,6 +128,7 @@ def create_device_dict(input_file):
         for row in reader: 
             globals.DEVICES[row["MAC"]] = {}
             globals.DEVICES[row["MAC"]]["Name"] = row["Name"]
+            globals.DEVICES[row["MAC"]]["MAC"] = row["MAC"]
             globals.DEVICES[row["MAC"]]["IPs"] = {}
             globals.DEVICES[row["MAC"]]["DNS"] = {}
 
