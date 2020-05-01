@@ -1,2 +1,4 @@
 MAC,Name
+00:17:88:75:b3:82,Philips Hue
+5c:cf:7f:1e:76:54,Soomfy Door Lock
 4c:ef:c0:27:56:1e,Amazon Echo Dot
