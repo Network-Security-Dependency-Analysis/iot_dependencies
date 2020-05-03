@@ -70,35 +70,32 @@ def extract_IPs(ether_pkt):
     source_mac = ether_pkt.src
     dest_ip = ether_pkt[IP].dst
 
-    # Is the packet from a device we care about?
-    if source_mac in globals.DEVICES.keys():
-        # Is the destination IP globally routable (i.e. not a private address)?
-        if ip_address(dest_ip).is_global:
-            if dest_ip not in globals.DEVICES[source_mac]["IPs"].keys():
-                ipgeo = get_ip_geo(dest_ip)
-                ipasn = get_ip_asn(dest_ip)
-                globals.DEVICES[source_mac]["IPs"][dest_ip] = {
-                    "count": 1,
-                    "lat": ipgeo[0],
-                    "lon": ipgeo[1],
-                    "asn": ipasn[0],
-                    "as_org": ipasn[1]
-                    }
-            else:
-                globals.DEVICES[source_mac]["IPs"][dest_ip]["count"] += 1
+    # Is the destination IP globally routable (i.e. not a private address)?
+    if ip_address(dest_ip).is_global:
+        if dest_ip not in globals.DEVICES[source_mac]["IPs"].keys():
+            ipgeo = get_ip_geo(dest_ip)
+            ipasn = get_ip_asn(dest_ip)
+            globals.DEVICES[source_mac]["IPs"][dest_ip] = {
+                "count": 1,
+                "lat": ipgeo[0],
+                "lon": ipgeo[1],
+                "asn": ipasn[0],
+                "as_org": ipasn[1]
+                }
+        else:
+            globals.DEVICES[source_mac]["IPs"][dest_ip]["count"] += 1
 
 
 def extract_dns(ether_pkt):
     source_mac = ether_pkt.src
-    # Is the packet from a device we care about?
-    if source_mac in globals.DEVICES.keys():
-        if ether_pkt[DNS].qr == 0: # DNS request
-            # Build DNSQR structure to extract name, convert from bytes to str
-            qname = DNSQR(ether_pkt[DNS].qd).qname.decode()
-            if qname in globals.DEVICES[source_mac]["DNS"].keys():
-                globals.DEVICES[source_mac]["DNS"][qname]["count"] += 1
-            else:
-                globals.DEVICES[source_mac]["DNS"][qname] = {"count": 1}
+    
+    if ether_pkt[DNS].qr == 0: # DNS request
+        # Build DNSQR structure to extract name, convert from bytes to str
+        qname = DNSQR(ether_pkt[DNS].qd).qname.decode()
+        if qname in globals.DEVICES[source_mac]["DNS"].keys():
+            globals.DEVICES[source_mac]["DNS"][qname]["count"] += 1
+        else:
+            globals.DEVICES[source_mac]["DNS"][qname] = {"count": 1}
 
 
 def analyze_pcap(pcap_name):
@@ -110,6 +107,10 @@ def analyze_pcap(pcap_name):
     
     for (pkt_data, *_) in p:
         ether_pkt = Ether(pkt_data)
+
+        # If the src MAC is not from a device we care about, skip packet
+        if ether_pkt.src not in globals.DEVICES.keys():
+            continue
 
         if ether_pkt.haslayer(DNS):
             # DNS queries are often sent to the local router, so 
