@@ -136,7 +136,7 @@ def create_device_dict(input_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse PCAP files for external device dependencies.")
-    parser.add_argument("-m", dest="device_map", type=str, help="CSV file mapping device MAC addresses to names", default="./device_map.txt")
+    parser.add_argument("-m", dest="device_map", type=str, help="CSV file mapping device MAC addresses to names", default="./device_map.csv")
     parser.add_argument("-p", dest="pcap_list", type=str, help="List of PCAP files to parse", default="./pcap_list.txt")
     parser.add_argument("-o", dest="output_dir", type=str, help="Directory to output JSON results", default="./data/")
     args = parser.parse_args()
