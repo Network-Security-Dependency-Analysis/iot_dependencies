@@ -10,6 +10,7 @@ import os
 import csv
 import argparse
 import json
+import socket
 from scapy.utils import RawPcapReader
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, TCP, UDP, ICMP
@@ -68,12 +69,16 @@ def get_ip_asn(ip_address):
 
 
 def extract_IPs(ether_pkt):
-    source_mac = ether_pkt.src
+    source_mac = ether_pkt.src.lower()
     dest_ip = ether_pkt[IP].dst
 
     # Is the destination IP globally routable (i.e. not a private address)?
     if ip_address(dest_ip).is_global:
         if dest_ip not in globals.DEVICES[source_mac]["IPs"].keys():
+            try:
+                hostname = socket.gethostbyaddr(dest_ip)[0]
+            except:
+                hostname = ""
             ipgeo = get_ip_geo(dest_ip)
             ipasn = get_ip_asn(dest_ip)
             globals.DEVICES[source_mac]["IPs"][dest_ip] = {
@@ -81,14 +86,15 @@ def extract_IPs(ether_pkt):
                 "lat": ipgeo[0],
                 "lon": ipgeo[1],
                 "asn": ipasn[0],
-                "as_org": ipasn[1]
+                "as_org": ipasn[1],
+                "hostname": hostname
                 }
         else:
             globals.DEVICES[source_mac]["IPs"][dest_ip]["count"] += 1
 
 
 def extract_dns(ether_pkt):
-    source_mac = ether_pkt.src
+    source_mac = ether_pkt.src.lower()
     
     if ether_pkt[DNS].qr == 0: # DNS request
         # Build DNSQR structure to extract name, convert from bytes to str
@@ -110,7 +116,7 @@ def analyze_pcap(pcap_name):
         ether_pkt = Ether(pkt_data)
 
         # If the src MAC is not from a device we care about, skip packet
-        if ether_pkt.src not in globals.DEVICES.keys():
+        if ether_pkt.src.lower() not in globals.DEVICES.keys():
             continue
 
         if ether_pkt.haslayer(DNS):
@@ -127,12 +133,13 @@ def analyze_pcap(pcap_name):
 def create_device_dict(input_file):
     with open(input_file) as csvfile:
         reader = csv.DictReader(csvfile)
-        for row in reader: 
-            globals.DEVICES[row["MAC"]] = {}
-            globals.DEVICES[row["MAC"]]["Name"] = row["Name"]
-            globals.DEVICES[row["MAC"]]["MAC"] = row["MAC"]
-            globals.DEVICES[row["MAC"]]["IPs"] = {}
-            globals.DEVICES[row["MAC"]]["DNS"] = {}
+        for row in reader:
+            mac = row["MAC"].lower()
+            globals.DEVICES[mac] = {}
+            globals.DEVICES[mac]["Name"] = row["Name"]
+            globals.DEVICES[mac]["MAC"] = mac
+            globals.DEVICES[mac]["IPs"] = {}
+            globals.DEVICES[mac]["DNS"] = {}
 
 
 if __name__ == "__main__":
